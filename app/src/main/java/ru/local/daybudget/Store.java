@@ -9,7 +9,7 @@ public final class Store {
  static String fmt(long n){return String.format(java.util.Locale.forLanguageTag("ru"),"%,.2f ₽",n/100.0);}
  static String edit(long n){return BigDecimal.valueOf(n,2).toPlainString();}
  static Long parse(String text){
-  Pattern re=Pattern.compile("(?iu)доступно\\s*[:：]?\\s*([0-9][0-9 \\u00a0\\u202f]*(?:[,.][0-9]{1,2})?)\\s*(?:₽|руб)");
+  Pattern re=Pattern.compile("(?iu)(?<![\\p{L}])(?:доступно|баланс)\\s*[:：]?\\s*([0-9][0-9 \\u00a0\\u202f]*(?:[,.][0-9]{1,2})?)\\s*(?:₽|руб)");
   Matcher m=re.matcher(text); if(!m.find())return null;
   try{return money(m.group(1));}catch(Exception e){return null;}
  }
