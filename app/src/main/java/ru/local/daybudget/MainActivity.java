@@ -31,18 +31,45 @@ public class MainActivity extends Activity {
  Button button(String s,Runnable r){Button b=new Button(this);b.setText(s);styleButton(b,false);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-1,-2);bp.setMargins(0,dp(6),0,dp(6));body.addView(b,bp);b.setOnClickListener(v->r.run());return b;}
  EditText field(String value,boolean number){EditText e=new EditText(this);e.setSingleLine(true);e.setTextColor(ink);e.setHintTextColor(dark?0xffb5adbf:0xff746c80);e.setBackgroundTintList(ColorStateList.valueOf(accent));e.setText(value);if(number)e.setInputType(2|8192|4096);body.addView(e);return e;}
  void draw(){
-  LinearLayout outer=new LinearLayout(this);outer.setOrientation(1);outer.setPadding(24,40,24,24);outer.setBackgroundColor(background);setContentView(outer);
+  LinearLayout outer=new LinearLayout(this);outer.setOrientation(1);outer.setPadding(dp(16),dp(12),dp(16),dp(16));outer.setBackgroundColor(background);
+ if(Build.VERSION.SDK_INT>=30){
+  getWindow().setDecorFitsSystemWindows(false);
+ }else{
+  getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION | (dark?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR));
+ }
+ getWindow().setStatusBarColor(Color.TRANSPARENT);
+ getWindow().setNavigationBarColor(Color.TRANSPARENT);
+ if(Build.VERSION.SDK_INT>=30 && getWindow().getInsetsController()!=null){
+  int flags=WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS | WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
+  getWindow().getInsetsController().setSystemBarsAppearance(dark?0:flags,flags);
+ }
+ outer.setOnApplyWindowInsetsListener((view,insets)->{
+  int left,top,right,bottom;
+  if(Build.VERSION.SDK_INT>=30){
+   android.graphics.Insets bars=insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+   android.graphics.Insets keyboard=insets.getInsets(WindowInsets.Type.ime());
+   left=bars.left;top=bars.top;right=bars.right;bottom=Math.max(bars.bottom,keyboard.bottom);
+  }else{
+   left=insets.getSystemWindowInsetLeft();top=insets.getSystemWindowInsetTop();right=insets.getSystemWindowInsetRight();bottom=insets.getSystemWindowInsetBottom();
+   if(Build.VERSION.SDK_INT>=28 && insets.getDisplayCutout()!=null){
+    DisplayCutout cutout=insets.getDisplayCutout();left=Math.max(left,cutout.getSafeInsetLeft());top=Math.max(top,cutout.getSafeInsetTop());right=Math.max(right,cutout.getSafeInsetRight());bottom=Math.max(bottom,cutout.getSafeInsetBottom());
+   }
+  }
+  view.setPadding(dp(16)+left,dp(12)+top,dp(16)+right,dp(16)+bottom);
+  return insets;
+ });
+ setContentView(outer);outer.requestApplyInsets();
   TextView title=new TextView(this);title.setText("Дневной бюджет");title.setTextSize(26);title.setTextColor(ink);outer.addView(title);
   LinearLayout nav=new LinearLayout(this);outer.addView(nav);
   String[] labels={"Обзор","Карта","Наличные","⚙"};for(int i=0;i<4;i++){final int n=i;Button b=new Button(this);b.setText(labels[i]);b.setTextSize(12);styleButton(b,i==tab);LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(0,-2,1);np.setMargins(dp(2),dp(8),dp(2),dp(8));nav.addView(b,np);b.setOnClickListener(v->{tab=n;draw();});}
   ScrollView scroll=new ScrollView(this);outer.addView(scroll);body=new LinearLayout(this);body.setOrientation(1);scroll.addView(body);
-  if(tab==0){summary=text("",22);overviewText();text("Лимит = (карта + наличные) ÷ дни до зарплаты. Сегодня входит в расчёт, день зарплаты — нет. При наступлении зарплаты дата переносится на следующий месяц. Сам доход автоматически не начисляется.",15);}
+  if(tab==0){summary=text("",22);overviewText();text("Лимит = (карта + наличные) ÷ дни до зарплаты. В расчёт входят сегодняшний день и день зарплаты. На следующий день после зарплаты дата переносится на следующий месяц. Сам доход автоматически не начисляется.",15);}
   if(tab==1||tab==2){boolean cash=tab==2;String key=cash?"cash":"card";text(cash?"Наличные":"Карта Т-Банка",24);text("Текущий остаток: "+Store.fmt(p.getLong(key,0)),20);EditText amount=field(Store.edit(p.getLong(key,0)),true);
    button("Сохранить остаток",()->{try{long a=Store.money(amount.getText().toString());p.edit().putLong(key,a).apply();draw();}catch(Exception e){toast("Введите сумму, например 1234,56");}});
    if(cash){EditText delta=field("",true);delta.setHint("Сумма операции");button("Потратил наличные",()->cashChange(delta,-1));button("Добавить наличные",()->cashChange(delta,1));}
    else text("Остаток заменяется суммой после «Доступно» или «Баланс» в новых уведомлениях банка. Он не уменьшается повторно на сумму покупки. Ручной остаток будет заменён следующим подходящим уведомлением.",16);
   }
-  if(tab==3){text("Настройки",24);
+  if(tab==3){text("Настройки",24);text("Разработано Renoviso",16);
  String mode=p.getString("theme","system");
  button("Тема: "+(mode.equals("dark")?"Тёмная":mode.equals("light")?"Светлая":"Как в системе"),()->{
   String[] names={"Как в системе","Светлая","Тёмная"};String[] keys={"system","light","dark"};
@@ -61,8 +88,8 @@ public class MainActivity extends Activity {
    text("Диагностика: "+p.getString("status","Уведомления ещё не обработаны"),15);
   }
  }
- void overviewText(){if(summary==null)return;long card=p.getLong("card",0),cash=p.getLong("cash",0),total=card+cash;LocalDate salary=Store.salary(this);long days=ChronoUnit.DAYS.between(LocalDate.now(),salary);long per=java.math.BigDecimal.valueOf(total).divide(java.math.BigDecimal.valueOf(days),0,java.math.RoundingMode.FLOOR).longValue();long updated=p.getLong("updated",0);
- summary.setText("Можно в день\n"+Store.fmt(per)+"\n\nКарта: "+Store.fmt(card)+"\nНаличные: "+Store.fmt(cash)+"\nВсего: "+Store.fmt(total)+"\n\nДо зарплаты: "+days+" дн.\nДата: "+salary.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"))+"\n\nБанк: "+(updated==0?"пока нет обновлений":java.text.DateFormat.getDateTimeInstance().format(new java.util.Date(updated))));}
+ void overviewText(){if(summary==null)return;long card=p.getLong("card",0),cash=p.getLong("cash",0),total=card+cash;LocalDate salary=Store.salary(this);long days=ChronoUnit.DAYS.between(LocalDate.now(),salary)+1;long per=java.math.BigDecimal.valueOf(total).divide(java.math.BigDecimal.valueOf(days),0,java.math.RoundingMode.FLOOR).longValue();long updated=p.getLong("updated",0);
+ summary.setText("Можно в день\n"+Store.fmt(per)+"\n\nКарта: "+Store.fmt(card)+"\nНаличные: "+Store.fmt(cash)+"\nВсего: "+Store.fmt(total)+"\n\nДней в расчёте: "+days+" дн.\nДата: "+salary.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"))+"\n\nБанк: "+(updated==0?"пока нет обновлений":java.text.DateFormat.getDateTimeInstance().format(new java.util.Date(updated))));}
  void cashChange(EditText e,int sign){try{long a=Store.money(e.getText().toString());if(a<=0)throw new Exception();p.edit().putLong("cash",Math.addExact(p.getLong("cash",0),Math.multiplyExact(a,sign))).apply();draw();}catch(Exception ex){toast("Введите положительную сумму");}}
  int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
  void styleButton(Button b,boolean active){

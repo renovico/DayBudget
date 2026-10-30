@@ -16,6 +16,6 @@ public final class Store {
  static LocalDate salary(Context c){
   int day=p(c).getInt("day",10); LocalDate today=LocalDate.now(); YearMonth mo=YearMonth.from(today);
   LocalDate date=mo.atDay(Math.min(day,mo.lengthOfMonth()));
-  if(!date.isAfter(today)){mo=mo.plusMonths(1);date=mo.atDay(Math.min(day,mo.lengthOfMonth()));}return date;
+  if(date.isBefore(today)){mo=mo.plusMonths(1);date=mo.atDay(Math.min(day,mo.lengthOfMonth()));}return date;
  }
 }
