@@ -16,49 +16,46 @@ public class MainActivity extends Activity {
  android.content.SharedPreferences p; LinearLayout body; int tab=0; TextView summary; boolean dark; int ink, accent, surface, background;
  android.content.SharedPreferences.OnSharedPreferenceChangeListener changes=(prefs,key)->{if(tab==0)runOnUiThread(()->overviewText());};
  @Override public void onCreate(Bundle b){
- p=Store.p(this);
- String mode=p.getString("theme","system");
- dark=mode.equals("dark") || (mode.equals("system") && (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)==Configuration.UI_MODE_NIGHT_YES);
- setTheme(dark?android.R.style.Theme_Material_NoActionBar:android.R.style.Theme_Material_Light_NoActionBar);
  super.onCreate(b);
- ink=dark?0xfff0edf7:0xff252032;accent=dark?0xffc4abff:0xff6440ad;
- surface=dark?0xff24212d:0xffffffff;background=dark?0xff15131b:0xfff5f4fb;
- if(b!=null)tab=b.getInt("tab",0);p.registerOnSharedPreferenceChangeListener(changes);draw();
-}
- @Override protected void onDestroy(){p.unregisterOnSharedPreferenceChangeListener(changes);super.onDestroy();}
+ try{
+  p=Store.p(this);
+  String mode=p.getString("theme","system");
+  dark=mode.equals("dark") || (mode.equals("system") && (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)==Configuration.UI_MODE_NIGHT_YES);
+  setTheme(dark?android.R.style.Theme_Material_NoActionBar:android.R.style.Theme_Material_Light_NoActionBar);
+  ink=dark?0xfff0edf7:0xff252032;accent=dark?0xffc4abff:0xff6440ad;
+  surface=dark?0xff24212d:0xffffffff;background=dark?0xff15131b:0xfff5f4fb;
+  if(b!=null)tab=b.getInt("tab",0);
+  p.registerOnSharedPreferenceChangeListener(changes);draw();
+ }catch(RuntimeException | LinkageError error){showFailure(error);}
+ }
+ @Override protected void onDestroy(){if(p!=null)p.unregisterOnSharedPreferenceChangeListener(changes);super.onDestroy();}
  @Override protected void onResume(){super.onResume();if(tab==0 && summary!=null)overviewText();}
  TextView text(String s,int size){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(ink);t.setPadding(0,12,0,12);body.addView(t);return t;}
  Button button(String s,Runnable r){Button b=new Button(this);b.setText(s);styleButton(b,false);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-1,-2);bp.setMargins(0,dp(6),0,dp(6));body.addView(b,bp);b.setOnClickListener(v->r.run());return b;}
  EditText field(String value,boolean number){EditText e=new EditText(this);e.setSingleLine(true);e.setTextColor(ink);e.setHintTextColor(dark?0xffb5adbf:0xff746c80);e.setBackgroundTintList(ColorStateList.valueOf(accent));e.setText(value);if(number)e.setInputType(2|8192|4096);body.addView(e);return e;}
+ boolean showingFailure=false;
  void draw(){
-  LinearLayout outer=new LinearLayout(this);outer.setOrientation(1);outer.setPadding(dp(16),dp(12),dp(16),dp(16));outer.setBackgroundColor(background);
- if(Build.VERSION.SDK_INT>=30){
-  getWindow().setDecorFitsSystemWindows(false);
- }else{
-  getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION | (dark?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR));
+  try{drawContent();}catch(RuntimeException | LinkageError error){showFailure(error);}
  }
- getWindow().setStatusBarColor(Color.TRANSPARENT);
- getWindow().setNavigationBarColor(Color.TRANSPARENT);
- if(Build.VERSION.SDK_INT>=30 && getWindow().getInsetsController()!=null){
-  int flags=WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS | WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
-  getWindow().getInsetsController().setSystemBarsAppearance(dark?0:flags,flags);
- }
- outer.setOnApplyWindowInsetsListener((view,insets)->{
-  int left,top,right,bottom;
-  if(Build.VERSION.SDK_INT>=30){
-   android.graphics.Insets bars=insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
-   android.graphics.Insets keyboard=insets.getInsets(WindowInsets.Type.ime());
-   left=bars.left;top=bars.top;right=bars.right;bottom=Math.max(bars.bottom,keyboard.bottom);
-  }else{
-   left=insets.getSystemWindowInsetLeft();top=insets.getSystemWindowInsetTop();right=insets.getSystemWindowInsetRight();bottom=insets.getSystemWindowInsetBottom();
-   if(Build.VERSION.SDK_INT>=28 && insets.getDisplayCutout()!=null){
-    DisplayCutout cutout=insets.getDisplayCutout();left=Math.max(left,cutout.getSafeInsetLeft());top=Math.max(top,cutout.getSafeInsetTop());right=Math.max(right,cutout.getSafeInsetRight());bottom=Math.max(bottom,cutout.getSafeInsetBottom());
-   }
-  }
-  view.setPadding(dp(16)+left,dp(12)+top,dp(16)+right,dp(16)+bottom);
-  return insets;
- });
- setContentView(outer);outer.requestApplyInsets();
+ void drawContent(){
+  summary=null;
+  LinearLayout outer=new LinearLayout(this);outer.setOrientation(1);
+  outer.setPadding(dp(16),dp(12),dp(16),dp(16));outer.setBackgroundColor(background);
+  if(Build.VERSION.SDK_INT>=30)getWindow().setDecorFitsSystemWindows(false);
+  outer.setOnApplyWindowInsetsListener((view,insets)->{
+   try{
+    int left,top,right,bottom;
+    if(Build.VERSION.SDK_INT>=30){
+     android.graphics.Insets safe=insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout() | WindowInsets.Type.ime());
+     left=safe.left;top=safe.top;right=safe.right;bottom=safe.bottom;
+    }else{
+     left=insets.getSystemWindowInsetLeft();top=insets.getSystemWindowInsetTop();right=insets.getSystemWindowInsetRight();bottom=insets.getSystemWindowInsetBottom();
+    }
+    view.setPadding(dp(16)+left,dp(12)+top,dp(16)+right,dp(16)+bottom);
+   }catch(RuntimeException | LinkageError error){view.post(()->showFailure(error));}
+   return insets;
+  });
+  setContentView(outer);outer.requestApplyInsets();
   TextView title=new TextView(this);title.setText("Дневной бюджет");title.setTextSize(26);title.setTextColor(ink);outer.addView(title);
   LinearLayout nav=new LinearLayout(this);outer.addView(nav);
   String[] labels={"Обзор","Карта","Наличные","⚙"};for(int i=0;i<4;i++){final int n=i;Button b=new Button(this);b.setText(labels[i]);b.setTextSize(12);styleButton(b,i==tab);LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(0,-2,1);np.setMargins(dp(2),dp(8),dp(2),dp(8));nav.addView(b,np);b.setOnClickListener(v->{tab=n;draw();});}
@@ -88,7 +85,10 @@ public class MainActivity extends Activity {
    text("Диагностика: "+p.getString("status","Уведомления ещё не обработаны"),15);
   }
  }
- void overviewText(){if(summary==null)return;long card=p.getLong("card",0),cash=p.getLong("cash",0),total=card+cash;LocalDate salary=Store.salary(this);long days=ChronoUnit.DAYS.between(LocalDate.now(),salary)+1;long per=java.math.BigDecimal.valueOf(total).divide(java.math.BigDecimal.valueOf(days),0,java.math.RoundingMode.FLOOR).longValue();long updated=p.getLong("updated",0);
+ void overviewText(){
+  try{updateOverview();}catch(RuntimeException | LinkageError error){showFailure(error);}
+ }
+ void updateOverview(){if(summary==null || showingFailure)return;long card=p.getLong("card",0),cash=p.getLong("cash",0),total=card+cash;LocalDate salary=Store.salary(this);long days=ChronoUnit.DAYS.between(LocalDate.now(),salary)+1;long per=java.math.BigDecimal.valueOf(total).divide(java.math.BigDecimal.valueOf(days),0,java.math.RoundingMode.FLOOR).longValue();long updated=p.getLong("updated",0);
  summary.setText("Можно в день\n"+Store.fmt(per)+"\n\nКарта: "+Store.fmt(card)+"\nНаличные: "+Store.fmt(cash)+"\nВсего: "+Store.fmt(total)+"\n\nДней в расчёте: "+days+" дн.\nДата: "+salary.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"))+"\n\nБанк: "+(updated==0?"пока нет обновлений":java.text.DateFormat.getDateTimeInstance().format(new java.util.Date(updated))));}
  void cashChange(EditText e,int sign){try{long a=Store.money(e.getText().toString());if(a<=0)throw new Exception();p.edit().putLong("cash",Math.addExact(p.getLong("cash",0),Math.multiplyExact(a,sign))).apply();draw();}catch(Exception ex){toast("Введите положительную сумму");}}
  int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
@@ -102,4 +102,18 @@ public class MainActivity extends Activity {
  }
  @Override public void onSaveInstanceState(Bundle b){b.putInt("tab",tab);super.onSaveInstanceState(b);}
  void toast(String s){Toast.makeText(this,s,Toast.LENGTH_LONG).show();}
+ void showFailure(Throwable error){
+  if(showingFailure)return;
+  showingFailure=true;summary=null;tab=-1;
+  String report="Renoviso: диагностика запуска\nAndroid "+Build.VERSION.RELEASE+" / API "+Build.VERSION.SDK_INT+"\n\n"+android.util.Log.getStackTraceString(error);
+  android.util.Log.e("RenovisoStartup",report);
+  LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);panel.setPadding(dp(20),dp(60),dp(20),dp(24));panel.setBackgroundColor(Color.WHITE);
+  TextView title=new TextView(this);title.setText("Ошибка запуска — Renoviso");title.setTextColor(Color.BLACK);title.setTextSize(22);panel.addView(title);
+  Button copy=new Button(this);copy.setText("Скопировать ошибку");panel.addView(copy);
+  copy.setOnClickListener(v->{android.content.ClipboardManager clipboard=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);if(clipboard!=null)clipboard.setPrimaryClip(ClipData.newPlainText("Renoviso error",report));Toast.makeText(this,"Текст ошибки скопирован",Toast.LENGTH_LONG).show();});
+  ScrollView scroll=new ScrollView(this);panel.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+  TextView details=new TextView(this);details.setText(report);details.setTextColor(Color.BLACK);details.setTextIsSelectable(true);details.setTextSize(13);scroll.addView(details);
+  setContentView(panel);
+ }
+
 }
